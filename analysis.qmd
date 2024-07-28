@@ -1,0 +1,71 @@
+---
+title: "analysis"
+author: "Elaine Zhang"
+format: html
+execute: 
+  echo: false
+---
+
+We have data on candidates who ran for elections in 2000s. We want to figure out how long they live for after the election. One reason why we might doubt the data is because the life expectancy of people changes over time. It seems that on average, women live longer than men after an election.
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(primer.data)
+library(brms)
+library(tidybayes)
+library(gtsummary)
+
+
+head(governors)
+```
+
+```{r}
+#| cache: true
+df1 <- governors |>
+  select(last_name, year, state, sex, lived_after, election_age)
+
+fit_sex <- brm(
+  data = df1, 
+  formula = lived_after ~ sex,
+  silent = 2,
+  refresh = 0,
+  seed = 76)
+```
+```{r}
+#| cache: true
+fit_all <- brm(
+  data = df1, 
+  formula = lived_after ~ sex*election_age, 
+  silent = 2, 
+  refresh = 0, 
+  seed = 13)
+
+newobs <- tibble(sex = c("Male", "Female"), election_age = 50)
+```
+
+```{r}
+fit_all |> 
+  add_epred_draws(newdata = newobs) |> 
+  ggplot(aes(.epred, fill = sex)) +
+    geom_histogram(aes(y = after_stat(count/sum(count))),
+                   alpha = 0.5, 
+                   bins = 100, 
+                   position = "identity") +
+    labs(title = "Posterior for Expected Years Lived Post-Election",
+         subtitle = "Male candidates live longer",
+         x = "Years",
+         y = "Probability") + 
+    scale_x_continuous(labels = 
+                         scales::number_format(accuracy = 1)) +
+    scale_y_continuous(labels = 
+                         scales::percent_format(accuracy = 1)) +
+    theme_classic()
+```
+```{=tex}
+\begin{aligned}
+livedafter &=& \beta_0 + \beta_1{male_i} + \epsilon_i
+\end{aligned}
+```
+
